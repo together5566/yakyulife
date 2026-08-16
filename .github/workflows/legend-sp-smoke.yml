@@ -1,0 +1,23 @@
+name: Legend SP smoke
+
+on:
+  push:
+    branches: [legend-sp-a16e3]
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "checking $file"
+            node --check "$file"
+          done < <(find src -name '*.js' -print0)
