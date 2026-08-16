@@ -6,6 +6,7 @@ import {tlNote} from '../ui/timeline.js';
 import {ovr, playerType} from './ability.js';
 import {primaryPos} from './career.js';
 import {fmtMoney, makeOffers, pickOfferUI, signTo} from './contract.js';
+import {LEGEND_CPBL_TEAM, isLegendSp} from './legend-sp.js';
 import {startYear} from '../flow/phases.js';
 import {endGame} from '../ui/retire.js';
 /* ---------- 選秀與生涯路口 ---------- */
@@ -20,7 +21,8 @@ export function runDraft(fromSchool,cb){
   }
   const bonus=[0,1000,600,350,350,150,150,150,50,50,50][rd]||50;
   const lv=(rd===1&&o>=50)?'CPBL1':'CPBL2';
-  const team=pick(CPBL_TEAMS);
+  const rolledTeam=pick(CPBL_TEAMS); /* 傳奇模式仍消耗原本 RNG，避免後續亂數序列漂移 */
+  const team=isLegendSp()?LEGEND_CPBL_TEAM:rolledTeam;
   const accept=()=>{
     S.stage='PRO'; S.team=''; S.salary+=bonus; S.svc=0; S.faElig=false;
     signTo('CPBL',lv,team,ri(2,3),1); /* 菜鳥分段短約(2~3年) */
