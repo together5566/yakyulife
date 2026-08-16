@@ -6,13 +6,15 @@ import {tlNote} from '../ui/timeline.js';
 import {ovr, playerType} from './ability.js';
 import {primaryPos} from './career.js';
 import {fmtMoney, makeOffers, pickOfferUI, signTo} from './contract.js';
-import {LEGEND_CPBL_TEAM, isLegendSp} from './legend-sp.js';
+import {LEGEND_CPBL_TEAM, isLegendSp, legendBeforeAdvance, legendRememberSignedTeam} from './legend-sp.js';
 import {startYear} from '../flow/phases.js';
 import {endGame} from '../ui/retire.js';
 /* ---------- 選秀與生涯路口 ---------- */
 export function runDraft(fromSchool,cb){
   const o=ovr(); const score=o+Math.max(0,22-S.age)*2+ri(-4,4);
-  const rd=score>=56?1:score>=49?2:score>=43?ri(3,4):score>=37?ri(5,7):score>=30?ri(8,10):0;
+  let rd=score>=56?1:score>=49?2:score>=43?ri(3,4):score>=37?ri(5,7):score>=30?ri(8,10):0;
+  /* 傳奇先發模式必須從中職開局；保留能力造成的順位差，但不允許直接落榜斷線。 */
+  if(isLegendSp()&&rd===0)rd=8;
   if(rd===0){
     card('bad','選秀落榜',`唱名一輪又一輪，始終沒有你的名字。（綜合 ${o}｜年齡加權後評價 ${score}）`);
     if(fromSchool){ card('info','','回到校隊，明年再來。'); cb(); }
@@ -25,13 +27,12 @@ export function runDraft(fromSchool,cb){
   const team=isLegendSp()?LEGEND_CPBL_TEAM:rolledTeam;
   const accept=()=>{
     S.stage='PRO'; S.team=''; S.salary+=bonus; S.svc=0; S.faElig=false;
-    signTo('CPBL',lv,team,ri(2,3),1); /* 菜鳥分段短約(2~3年) */
+    signTo('CPBL',lv,team,ri(2,3),1);
     card('gold','中華職棒選秀會',`第 <b class="hl">${rd}</b> 輪獲 <b class="hl">${team}</b> 指名！簽約金依順位為 <b class="hl">${fmtMoney(bonus)}</b>。${lv==='CPBL1'?'即戰力評價，直接放入一軍名單。':'先從二軍出發。'}`);
-    tlNote(4,'選秀第'+rd+'輪');
-    board(0); cb();
+    tlNote(4,'選秀第'+rd+'輪'); board(0); cb();
   };
-  /* 輪次不滿意(第 3 輪以後)可選擇重返業餘再拚一年;年齡太大(24+)則不給這選項,避免拖太久 */
-  if(rd>=3 && S.age<24){
+  /* 傳奇模式不允許拒絕高雄神鵰指名，避免跑去大學改寫指定主線。 */
+  if(rd>=3 && S.age<24 && !isLegendSp()){
     choose(`中華職棒選秀會 · 第 ${rd} 輪獲 ${team} 指名`,[
       {t:'接受指名，加盟球隊',main:true,s:`簽約金 ${fmtMoney(bonus)}｜${lv==='CPBL1'?'一軍':'二軍'}出發`,f:accept},
       {t: (S.stage==='HS'||(S.stage==='U'&&S.stageYr<4))?'重返校園，再拚一年':'重返業餘，再拚一年',warn:true,s:'放棄本次指名，明年重新參加選秀',f:()=>{
@@ -56,6 +57,10 @@ export function pathChoiceHS(){
         {t:'改就讀大學',main:true,f:()=>{S.stage='U';S.stageYr=0;S.team=pick(['文化大學','輔仁大學','國立體大','台灣體大']);advance();}},
         {t:'加入業餘成棒隊',f:()=>{S.stage='AMA';S.team=pick(['合電','台庫','安妞先物','美麗珊瑚']);advance();}}]);
       else advance(); })}];
+  if(isLegendSp()){
+    choose(`高中畢業 · 弱校天才的第一個職業路口 · 綜合能力 ${o}`,[{...opts[1],main:true,s:'傳奇模式指定：投入中職，等待高雄神鵰指名'}]);
+    return;
+  }
   if(o>=44)opts.push({t:'洽談旅日合約',s:'從日職二軍（支配下）出發｜滿 8 年視同本土',f:()=>{
     S.stage='PRO';
     pickOfferUI('日職球團的育成報價','NPB',makeOffers('NPB',ri(2,3),800,3,3,'NPB2',null),()=>{
@@ -74,7 +79,6 @@ export function pathChoiceU4(){
       {t:'高掛球鞋',warn:true,f:()=>endGame('大學畢業選秀落榜，決定告別球場。')}]);
     else advance(); })}];
 
-  /* 大四畢業 (約22歲)，套用最大年齡懲罰 (Senior Sign) */
   const agePenalty = Math.max(0, S.age - 18);
   const reqNPB = 44 + Math.floor(agePenalty / 2);
   const reqMiLB = 50 + Math.floor(agePenalty / 2);
@@ -90,5 +94,18 @@ if(typeof document!=='undefined'&&document.getElementById('btn-menu')){
   document.getElementById('btn-menu').onclick=menuModal;
 }
 export function advance(){
+  const d=legendBeforeAdvance();
+  if(d){
+    if(d.kind==='retire'){
+      card('gold','傳奇生涯終章','所有約定都完成了。高雄的最後一季結束後，你沒有再多投一年，只留下這條跨越三個聯盟的履歷。');
+      endGame(d.reason); return;
+    }
+    if(['to-npb','to-mlb','return-npb','return-cpbl','correct'].includes(d.kind)){
+      if(d.kind!=='correct'){ S.svc=0; S.svcOrg=null; S.faElig=false; }
+      signTo(d.org,d.lv,d.team,2,1);
+      legendRememberSignedTeam(d.kind);
+      card(d.kind==='correct'?'info':'gold',d.kind==='correct'?'傳奇模式・路線修正':'傳奇生涯轉折',d.reason);
+    }
+  }
   S.age++; S.year++; S.stageYr++; startYear();
 }
