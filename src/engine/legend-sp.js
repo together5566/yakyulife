@@ -6,7 +6,7 @@ import {TIER_TH} from '../data/economy.js';
  * Legend SP mode — a16e3
  *
  * This module contains ONLY the special career rules. Normal YaKyoLife behavior
- * stays untouched unless the URL contains ?legend=sp and the player is a pitcher.
+ * stays untouched unless the page was opened with ?legend=sp and the player is a pitcher.
  */
 export const LEGEND_SP_SEED='a16e3';
 export const LEGEND_CPBL_TEAM='高雄神鵰';
@@ -15,14 +15,19 @@ export const LEGEND_MLB_EXIT_AGE=40;       // user accepts 38~40; use 40 for the
 export const LEGEND_MAJOR_INJURY_AGE=29;   // one non-TJ major injury, roughly a full lost season
 export const LEGEND_WBC_YEAR=2038;         // MLB prime: guaranteed WBC title + MVP
 
+/* main.js currently rewrites the URL to ?seed=... when Start is pressed. Capture
+   legend=sp at module-load time so the mode does not disappear afterwards. */
+const LEGEND_REQUESTED_AT_LOAD=typeof location!=='undefined'&&new URLSearchParams(location.search).get('legend')==='sp';
+
 export function legendSpRequested(){
+  if(LEGEND_REQUESTED_AT_LOAD)return true;
   if(typeof location==='undefined')return false;
   return new URLSearchParams(location.search).get('legend')==='sp';
 }
-export function isLegendSp(){ return !!(S&&S.legendSp&&S.legendSp.enabled); }
 
 export function initLegendSpState(){
   if(!S||S.pos!=='P'||!legendSpRequested())return false;
+  if(S.legendSp&&S.legendSp.enabled)return true;
   S.legendSp={
     enabled:true,
     seed:SEED,
@@ -47,11 +52,14 @@ export function initLegendSpState(){
     S.team='東大體中';
     S.hsTier=3;
   }
-
-  /* Legend mode keeps normal HOF scoring for NPB/MLB. CPBL may be adjusted only
-     after the final one-year return, because the user explicitly refuses an
-     extra CPBL season just to grind HOF score. */
   return true;
+}
+
+/* Lazy init lets draft/season modules enable legend mode without touching main.js. */
+export function isLegendSp(){
+  if(!S||S.pos!=='P'||!legendSpRequested())return false;
+  if(!S.legendSp||!S.legendSp.enabled)initLegendSpState();
+  return !!(S.legendSp&&S.legendSp.enabled);
 }
 
 export function legendForceCpblTeam(){
