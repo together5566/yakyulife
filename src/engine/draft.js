@@ -7,6 +7,7 @@ import {ovr, playerType} from './ability.js';
 import {primaryPos} from './career.js';
 import {fmtMoney, makeOffers, pickOfferUI, signTo} from './contract.js';
 import {LEGEND_CPBL_TEAM, isLegendSp, legendBeforeAdvance, legendRememberSignedTeam} from './legend-sp.js';
+import './legend-velocity.js';
 import {startYear} from '../flow/phases.js';
 import {endGame} from '../ui/retire.js';
 /* ---------- 選秀與生涯路口 ---------- */
